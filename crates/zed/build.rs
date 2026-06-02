@@ -1,6 +1,94 @@
 #![allow(clippy::disallowed_methods, reason = "build scripts are exempt")]
 use std::process::Command;
 
+/// Prebuilt `webrtc.lib` references MSVC STL symbols (`__std_search_1`, etc.).
+#[cfg(all(target_os = "windows", target_env = "msvc"))]
+fn link_webrtc_msvc_stl() {
+    use cc::windows_registry;
+    use std::path::PathBuf;
+
+    let Ok(target) = std::env::var("TARGET") else {
+        return;
+    };
+    let Ok(arch) = std::env::var("CARGO_CFG_TARGET_ARCH") else {
+        return;
+    };
+    let arch_dir = match arch.as_str() {
+        "x86_64" => "x64",
+        "aarch64" => "arm64",
+        _ => return,
+    };
+
+    let lib_dir = find_newest_msvc_lib_dir(arch_dir).or_else(|| {
+        let tool = windows_registry::find_tool(&target, "cl.exe")?;
+        let spectre_lib = tool
+            .path()
+            .join(format!(r"..\..\..\..\lib\spectre\{arch_dir}"));
+        let default_lib = tool.path().join(format!(r"..\..\..\..\lib\{arch_dir}"));
+        if spectre_lib.exists() {
+            Some(spectre_lib)
+        } else if default_lib.exists() {
+            Some(default_lib)
+        } else {
+            None
+        }
+    });
+
+    let Some(lib_dir) = lib_dir else {
+        println!("cargo:warning=MSVC lib directory not found for WebRTC linking");
+        return;
+    };
+
+    println!(
+        "cargo:rustc-link-search=native={}",
+        lib_dir.into_os_string().into_string().unwrap()
+    );
+    // Prebuilt WebRTC uses release (/MT) STL regardless of Zed profile.
+    println!("cargo:rustc-link-lib=static=libcpmt");
+}
+
+#[cfg(all(target_os = "windows", target_env = "msvc"))]
+fn find_newest_msvc_lib_dir(arch_dir: &str) -> Option<std::path::PathBuf> {
+    use std::path::PathBuf;
+
+    const MSVC_ROOTS: &[&str] = &[
+        r"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC",
+        r"C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Tools\MSVC",
+        r"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC",
+        r"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC",
+        r"C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC",
+    ];
+
+    let mut best: Option<(String, PathBuf)> = None;
+
+    for root in MSVC_ROOTS {
+        let Ok(entries) = std::fs::read_dir(root) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let version = entry.file_name().to_string_lossy().into_owned();
+            let spectre = entry
+                .path()
+                .join("lib")
+                .join("spectre")
+                .join(arch_dir);
+            let normal = entry.path().join("lib").join(arch_dir);
+            let lib_dir = if spectre.exists() { spectre } else { normal };
+            if !lib_dir.exists() {
+                continue;
+            }
+            if best
+                .as_ref()
+                .is_none_or(|(current, _)| version > *current)
+            {
+                best = Some((version, lib_dir));
+            }
+        }
+    }
+
+    best.map(|(_, path)| path)
+}
+
 fn main() {
     #[cfg(target_os = "linux")]
     {
@@ -84,6 +172,8 @@ fn main() {
 
     if cfg!(windows) {
         if cfg!(target_env = "msvc") {
+            link_webrtc_msvc_stl();
+
             // todo(windows): This is to avoid stack overflow. Remove it when solved.
             println!("cargo:rustc-link-arg=/stack:{}", 8 * 1024 * 1024);
         }

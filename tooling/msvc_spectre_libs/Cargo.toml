@@ -1,0 +1,17 @@
+[package]
+name = "msvc_spectre_libs"
+version = "0.1.3"
+edition = "2021"
+description = "Zed patch: link Spectre-mitigated MSVC libs when present, warn otherwise"
+license = "MIT OR Apache-2.0"
+build = "build.rs"
+
+[features]
+# Kept for compatibility with python-environment-tools; never fails the build.
+error = []
+
+[lib]
+path = "src/lib.rs"
+
+[target.'cfg(all(target_os = "windows", target_env = "msvc"))'.build-dependencies]
+cc = "1.0"
