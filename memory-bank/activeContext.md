@@ -9,7 +9,7 @@
 - Установлены: Windows SDK 10.0.26100, VS 2022 Community (MSVC 14.44 + Spectre libs)
 - Патч `tooling/msvc_spectre_libs` для python-environment-tools без жёсткого требования Spectre
 - Линковка WebRTC STL через `crates/zed/build.rs` (libcpmt из newest MSVC)
-- Очищен `target/` (~43 ГБ) из-за нехватки места на диске C:
+- Git: `origin` → `https://github.com/zed-industries/zed.git` (без fork hvkeyn); `main` rebased на актуальный upstream + 1 локальный коммит
 
 ## Recent Changes
 
