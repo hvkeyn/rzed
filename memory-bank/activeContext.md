@@ -5,6 +5,7 @@
 Настройка проекта для эффективной работы агентов в Zed. Проект представляет собой форк или локальную копию репозитория Zed (директория `rzed`), с настроенными агентскими инструментами и Memory Bank.
 
 ### Текущая сессия
+- Отключена Zed Cloud авторизация в rZed (`client::CLOUD_AUTH_ENABLED = false`, без автологина при старте, `show_sign_in: false`)
 - Починена сборка Zed под Windows (debug, x86_64)
 - Установлены: Windows SDK 10.0.26100, VS 2022 Community (MSVC 14.44 + Spectre libs)
 - Патч `tooling/msvc_spectre_libs` для python-environment-tools без жёсткого требования Spectre

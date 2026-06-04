@@ -869,11 +869,13 @@ fn main() {
 
         cx.activate(true);
 
-        cx.spawn({
-            let client = app_state.client.clone();
-            async move |cx| authenticate(client, cx).await
-        })
-        .detach_and_log_err(cx);
+        if client::CLOUD_AUTH_ENABLED {
+            cx.spawn({
+                let client = app_state.client.clone();
+                async move |cx| authenticate(client, cx).await
+            })
+            .detach_and_log_err(cx);
+        }
 
         let urls: Vec<_> = args
             .paths_or_urls
@@ -1444,6 +1446,10 @@ fn handle_open_request(request: OpenRequest, app_state: Arc<AppState>, cx: &mut 
 }
 
 async fn authenticate(client: Arc<Client>, cx: &AsyncApp) -> Result<()> {
+    if !client::CLOUD_AUTH_ENABLED {
+        return Ok(());
+    }
+
     if stdout_is_a_pty() {
         if client::IMPERSONATE_LOGIN.is_some() {
             client.sign_in_with_optional_connect(false, cx).await?;

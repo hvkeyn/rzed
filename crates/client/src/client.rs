@@ -78,6 +78,9 @@ pub static ADMIN_API_TOKEN: LazyLock<Option<String>> = LazyLock::new(|| {
         .and_then(|s| if s.is_empty() { None } else { Some(s) })
 });
 
+/// rZed: Zed Cloud sign-in, credential validation, collab RPC, and cloud websocket are disabled.
+pub const CLOUD_AUTH_ENABLED: bool = false;
+
 pub static ZED_APP_PATH: LazyLock<Option<PathBuf>> =
     LazyLock::new(|| std::env::var("ZED_APP_PATH").ok().map(PathBuf::from));
 
@@ -165,16 +168,7 @@ impl Settings for ProxySettings {
 
 pub fn init(client: &Arc<Client>, cx: &mut App) {
     let client = Arc::downgrade(client);
-    cx.on_action({
-        let client = client.clone();
-        move |_: &SignIn, cx| {
-            if let Some(client) = client.upgrade() {
-                cx.spawn(async move |cx| client.sign_in_with_optional_connect(true, cx).await)
-                    .detach_and_log_err(cx);
-            }
-        }
-    })
-    .on_action({
+    let mut actions = cx.on_action({
         let client = client.clone();
         move |_: &SignOut, cx| {
             if let Some(client) = client.upgrade() {
@@ -184,8 +178,21 @@ pub fn init(client: &Arc<Client>, cx: &mut App) {
                 .detach();
             }
         }
-    })
-    .on_action({
+    });
+    if CLOUD_AUTH_ENABLED {
+        actions = actions.on_action({
+            let client = client.clone();
+            move |_: &SignIn, cx| {
+                if let Some(client) = client.upgrade() {
+                    cx.spawn(
+                        async move |cx| client.sign_in_with_optional_connect(true, cx).await,
+                    )
+                    .detach_and_log_err(cx);
+                }
+            }
+        });
+    }
+    actions.on_action({
         let client = client;
         move |_: &Reconnect, cx| {
             if let Some(client) = client.upgrade() {
@@ -879,6 +886,11 @@ impl Client {
         try_provider: bool,
         cx: &AsyncApp,
     ) -> Result<Credentials> {
+        if !CLOUD_AUTH_ENABLED {
+            self.set_status(Status::SignedOut, cx);
+            return Err(anyhow!("Zed Cloud sign-in is disabled in rZed"));
+        }
+
         let is_reauthenticating = if self.status().borrow().is_signed_out() {
             self.set_status(Status::Authenticating, cx);
             false
@@ -978,6 +990,10 @@ impl Client {
     /// The connection is re-established with exponential backoff if it drops or fails to
     /// establish.
     fn connect_to_cloud(self: &Arc<Self>, cx: &AsyncApp) {
+        if !CLOUD_AUTH_ENABLED {
+            return;
+        }
+
         let this = self.clone();
         let task = cx.spawn(async move |cx| {
             #[cfg(any(test, feature = "test-support"))]
@@ -1041,6 +1057,10 @@ impl Client {
         try_provider: bool,
         cx: &AsyncApp,
     ) -> Result<()> {
+        if !CLOUD_AUTH_ENABLED {
+            return Ok(());
+        }
+
         // Don't try to sign in again if we're already connected to Collab, as it will temporarily disconnect us.
         if self.status().borrow().is_connected() {
             return Ok(());
@@ -1090,6 +1110,10 @@ impl Client {
         try_provider: bool,
         cx: &AsyncApp,
     ) -> ConnectionResult<()> {
+        if !CLOUD_AUTH_ENABLED {
+            return ConnectionResult::Result(Err(anyhow!("Zed Cloud is disabled in rZed")));
+        }
+
         let was_disconnected = match *self.status().borrow() {
             Status::SignedOut | Status::Authenticated => true,
             Status::ConnectionError
