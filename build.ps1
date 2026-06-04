@@ -364,7 +364,7 @@ function Build-Binaries {
         if ($LASTEXITCODE -ne 0) {
             throw "Build failed for zed/cli/auto_update_helper (exit code: $LASTEXITCODE)"
         }
-        Write-Host "  zed.exe, cli.exe, auto_update_helper.exe built." -ForegroundColor Green
+        Write-Host "  rzed.exe, cli.exe, auto_update_helper.exe built." -ForegroundColor Green
 
         # explorer_command_injector.dll
         Write-Host ""
@@ -538,10 +538,10 @@ function Assemble-Distribution {
     # --- Main executable ---
     Write-Host ""
     Write-Host "  Copying binaries..." -ForegroundColor White
-    Copy-Item -Path "$srcDir\zed.exe" -Destination "$DistDir\Zed.exe" -Force
-    $zedSize = (Get-Item "$DistDir\Zed.exe").Length
+    Copy-Item -Path "$srcDir\rzed.exe" -Destination "$DistDir\RZed.exe" -Force
+    $zedSize = (Get-Item "$DistDir\RZed.exe").Length
     $zedSizeMB = [math]::Round($zedSize / 1048576, 1)
-    Write-Host "  zed.exe -> dist\Zed.exe ($zedSizeMB MB)" -ForegroundColor Green
+    Write-Host "  rzed.exe -> dist\RZed.exe ($zedSizeMB MB)" -ForegroundColor Green
 
     # --- CLI ---
     if (Test-Path "$srcDir\cli.exe") {
@@ -596,7 +596,7 @@ function Assemble-Distribution {
     if (-not $Release) {
         Write-Host ""
         Write-Host "  Copying debug symbols..." -ForegroundColor White
-        $pdbNames = @("zed.pdb", "cli.pdb", "auto_update_helper.pdb",
+        $pdbNames = @("rzed.pdb", "cli.pdb", "auto_update_helper.pdb",
             "explorer_command_injector.pdb", "remote_server.pdb")
         foreach ($pdbName in $pdbNames) {
             $pdbPath = "$srcDir\$pdbName"
@@ -618,7 +618,7 @@ function Verify-Distribution {
     Write-Host "   Step 5: Verifying Distribution" -ForegroundColor Cyan
     Write-Host "============================================================" -ForegroundColor Cyan
 
-    $required = @("$DistDir\Zed.exe")
+    $required = @("$DistDir\RZed.exe")
     $optional = @(
         "$DistDir\conpty.dll",
         "$DistDir\amd_ags_x64.dll",
@@ -659,13 +659,13 @@ function Verify-Distribution {
     # Check if binary can start
     Write-Host ""
     Write-Host "  Testing binary..." -ForegroundColor White
-    $zedExe = "$DistDir\Zed.exe"
+    $zedExe = "$DistDir\RZed.exe"
     try {
         $versionOutput = & $zedExe --version 2>&1
-        Write-Host "  Zed.exe --version: $versionOutput" -ForegroundColor Green
+        Write-Host "  RZed.exe --version: $versionOutput" -ForegroundColor Green
     }
     catch {
-        Write-Host "  [WARN] Could not run Zed.exe --version" -ForegroundColor Yellow
+        Write-Host "  [WARN] Could not run RZed.exe --version" -ForegroundColor Yellow
         Write-Host "  $_" -ForegroundColor Yellow
     }
 
@@ -725,7 +725,7 @@ function Main {
     Write-Host "============================================================================" -ForegroundColor Magenta
     Write-Host "   DONE! Build time: $timeStr" -ForegroundColor Magenta
     Write-Host "   Distribution: $resolved" -ForegroundColor Magenta
-    Write-Host "   Run: .\$DistDir\Zed.exe" -ForegroundColor Magenta
+    Write-Host "   Run: .\$DistDir\RZed.exe" -ForegroundColor Magenta
     Write-Host "============================================================================" -ForegroundColor Magenta
 }
 
